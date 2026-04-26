@@ -34,6 +34,11 @@ mun_densidad = mun.features.map(f => {
 //| echo: false
 //| panel: input
 
+viewof mostrar_burbujas = Inputs.toggle({
+  label: "Densidad poblacional municipal",
+  value: true
+})
+
 viewof depto_map = Inputs.select(nombres_deptos, {
   label: "📍 Departamento",
   value: "— Colombia (todos) —"
@@ -229,51 +234,54 @@ color_mun = mun_filtrado
     ? mun_densidad
     : mun_densidad.filter(d => d.depto === depto_map)
 
-  const r = d3.scaleSqrt(
-    [0, d3.max(mun_densidad, d => d.densidad)],
+  const local_max = d3.max(mun_vis.filter(d => d.pob > 0), d => d.densidad) || 1
+  const r_bub = d3.scaleSqrt(
+    [0, local_max],
     [0, depto_map === "— Colombia (todos) —" ? 18 : 30]
   )
 
-  const bubble_tip = container.append("div")
-    .style("position",       "absolute")
-    .style("pointer-events", "none")
-    .style("background",     "rgba(10,40,80,0.88)")
-    .style("color",          "white")
-    .style("padding",        "6px 11px")
-    .style("border-radius",  "6px")
-    .style("font-size",      "12px")
-    .style("line-height",    "1.5")
-    .style("display",        "none")
+  if (mostrar_burbujas) {
+    const bubble_tip = container.append("div")
+      .style("position",       "absolute")
+      .style("pointer-events", "none")
+      .style("background",     "rgba(10,40,80,0.88)")
+      .style("color",          "white")
+      .style("padding",        "6px 11px")
+      .style("border-radius",  "6px")
+      .style("font-size",      "12px")
+      .style("line-height",    "1.5")
+      .style("display",        "none")
 
-  svg.append("g")
-    .attr("fill",         "#c0392b")
-    .attr("fill-opacity", 0.55)
-    .attr("stroke",       "white")
-    .attr("stroke-width", 0.6)
-    .selectAll("circle")
-    .data(mun_vis.filter(d => d.pob > 0).sort((a, b) => b.densidad - a.densidad))
-    .join("circle")
-      .attr("cx", d => path.centroid(d.feature)[0])
-      .attr("cy", d => path.centroid(d.feature)[1])
-      .attr("r",  d => r(d.densidad))
-    .on("mouseover", function(event, d) {
-      d3.select(this).attr("fill-opacity", 0.85)
-      bubble_tip
-        .style("display", "block")
-        .html(`<b>${d.nombre}</b> · ${d.depto}<br>
-               <span style="font-size:11px">
-                 Densidad: <b>${d.densidad.toFixed(1)} hab/km²</b><br>
-                 Población: ${d.pob.toLocaleString('es-CO')}
-               </span>`)
-    })
-    .on("mousemove", function(event) {
-      const [mx, my] = d3.pointer(event, container.node())
-      bubble_tip.style("left", (mx + 14) + "px").style("top", (my - 48) + "px")
-    })
-    .on("mouseout", function() {
-      d3.select(this).attr("fill-opacity", 0.55)
-      bubble_tip.style("display", "none")
-    })
+    svg.append("g")
+      .attr("fill",         "#c0392b")
+      .attr("fill-opacity", 0.55)
+      .attr("stroke",       "white")
+      .attr("stroke-width", 0.6)
+      .selectAll("circle")
+      .data(mun_vis.filter(d => d.pob > 0).sort((a, b) => b.densidad - a.densidad))
+      .join("circle")
+        .attr("cx", d => path.centroid(d.feature)[0])
+        .attr("cy", d => path.centroid(d.feature)[1])
+        .attr("r",  d => r_bub(d.densidad))
+      .on("mouseover", function(event, d) {
+        d3.select(this).attr("fill-opacity", 0.85)
+        bubble_tip
+          .style("display", "block")
+          .html(`<b>${d.nombre}</b> · ${d.depto}<br>
+                 <span style="font-size:11px">
+                   Densidad: <b>${d.densidad.toFixed(1)} hab/km\u00b2</b><br>
+                   Pob: ${d.pob.toLocaleString("es-CO")}
+                 </span>`)
+      })
+      .on("mousemove", function(event) {
+        const [mx, my] = d3.pointer(event, container.node())
+        bubble_tip.style("left", (mx + 14) + "px").style("top", (my - 48) + "px")
+      })
+      .on("mouseout", function() {
+        d3.select(this).attr("fill-opacity", 0.55)
+        bubble_tip.style("display", "none")
+      })
+  }
 
   const info_y = height - 35
   const infobar = svg.append("g")
