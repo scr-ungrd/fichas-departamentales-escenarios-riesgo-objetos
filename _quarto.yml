@@ -1,0 +1,10 @@
+project:
+  type: default
+  resources:
+    - data/
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    self-contained: true

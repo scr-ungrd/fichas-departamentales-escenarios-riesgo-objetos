@@ -1,0 +1,6 @@
+*.html
+*.quarto_ipynb
+.quarto/
+_site/
+__pycache__/
+.ipynb_checkpoints/
