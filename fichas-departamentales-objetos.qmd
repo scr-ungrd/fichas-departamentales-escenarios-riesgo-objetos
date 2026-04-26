@@ -1,5 +1,5 @@
 ---
-title: "Figuras de Fichas Departamentales"
+title: "Objetos de Fichas Departamentales"
 ---
 
 # Mapas del departamento y municipios
