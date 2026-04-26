@@ -7,7 +7,8 @@ title: "Objetos de Fichas Departamentales"
 ```{ojs}
 //| echo: false
 
-topo = FileAttachment("data/colombia_moderate.topojson").json()
+topo    = FileAttachment("data/colombia_moderate.topojson").json()
+pob_raw = FileAttachment("data/poblacion_mun_2026.json").json()
 
 dept = topojson.feature(topo, topo.objects.departamentos)
 mun  = topojson.feature(topo, topo.objects.municipios)
@@ -15,6 +16,18 @@ mun  = topojson.feature(topo, topo.objects.municipios)
 nombres_deptos = ["— Colombia (todos) —",
   ...new Set(dept.features.map(f => f.properties.departamento).sort())
 ]
+
+// Índice rápido departamento|municipio → población
+pob_index = new Map(pob_raw.map(d => [`${d.departamento}|${d.municipio}`, d.poblacion]))
+
+// Densidad por municipio: hab/km² usando área geodésica real
+mun_densidad = mun.features.map(f => {
+  const key  = `${f.properties.departamento}|${f.properties.municipio}`
+  const pob  = pob_index.get(key) ?? 0
+  const area = d3.geoArea(f) * 6371 ** 2   // esteradianes → km²
+  return { feature: f, densidad: pob / area, pob, area,
+           nombre: f.properties.municipio, depto: f.properties.departamento }
+})
 ```
 
 ```{ojs}
@@ -210,6 +223,57 @@ color_mun = mun_filtrado
         tooltip.style("display", "none")
       })
   }
+
+  // --- Bubble map: densidad de habitantes por municipio ---
+  const mun_vis = depto_map === "— Colombia (todos) —"
+    ? mun_densidad
+    : mun_densidad.filter(d => d.depto === depto_map)
+
+  const r = d3.scaleSqrt(
+    [0, d3.max(mun_densidad, d => d.densidad)],
+    [0, depto_map === "— Colombia (todos) —" ? 18 : 30]
+  )
+
+  const bubble_tip = container.append("div")
+    .style("position",       "absolute")
+    .style("pointer-events", "none")
+    .style("background",     "rgba(10,40,80,0.88)")
+    .style("color",          "white")
+    .style("padding",        "6px 11px")
+    .style("border-radius",  "6px")
+    .style("font-size",      "12px")
+    .style("line-height",    "1.5")
+    .style("display",        "none")
+
+  svg.append("g")
+    .attr("fill",         "#c0392b")
+    .attr("fill-opacity", 0.55)
+    .attr("stroke",       "white")
+    .attr("stroke-width", 0.6)
+    .selectAll("circle")
+    .data(mun_vis.filter(d => d.pob > 0).sort((a, b) => b.densidad - a.densidad))
+    .join("circle")
+      .attr("cx", d => path.centroid(d.feature)[0])
+      .attr("cy", d => path.centroid(d.feature)[1])
+      .attr("r",  d => r(d.densidad))
+    .on("mouseover", function(event, d) {
+      d3.select(this).attr("fill-opacity", 0.85)
+      bubble_tip
+        .style("display", "block")
+        .html(`<b>${d.nombre}</b> · ${d.depto}<br>
+               <span style="font-size:11px">
+                 Densidad: <b>${d.densidad.toFixed(1)} hab/km²</b><br>
+                 Población: ${d.pob.toLocaleString('es-CO')}
+               </span>`)
+    })
+    .on("mousemove", function(event) {
+      const [mx, my] = d3.pointer(event, container.node())
+      bubble_tip.style("left", (mx + 14) + "px").style("top", (my - 48) + "px")
+    })
+    .on("mouseout", function() {
+      d3.select(this).attr("fill-opacity", 0.55)
+      bubble_tip.style("display", "none")
+    })
 
   const info_y = height - 35
   const infobar = svg.append("g")
